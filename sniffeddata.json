@@ -1,0 +1,44 @@
+{
+    "user": {
+        "id": "459742547305299981"
+    },
+    "status": "idle",
+    "guild_id": "459742962549653505",
+    "client_status": {
+        "desktop": "idle"
+    },
+    "broadcast": null,
+    "activities": [
+        {
+            "type": 0,
+            "timestamps": {
+                "start": 1717727050531
+            },
+            "name": "Grand Theft Auto IV",
+            "id": "fecea5708d8facc",
+            "created_at": 1717727060771,
+            "application_id": "450005834672373760"
+        },
+        {
+            "type": 0,
+            "timestamps": {
+                "start": 1717727164209,
+                "end": 1717727412796
+            },
+            "state": "by Lil Wayne",
+            "session_id": "9744923bf85124073df45360e85e0016",
+            "name": "Apple Music",
+            "id": "fd7622c6b65416ec",
+            "details": "6 Foot 7 Foot (feat. Cory Gunz)",
+            "created_at": 1717727164971,
+            "buttons": [
+                "Open in Apple Music"
+            ],
+            "assets": {
+                "large_text": "Tha Carter IV (Complete Edition)",
+                "large_image": "mp:external/WLk7aKqikt6GRPnbrwhP-3I6yXKqp1LluX8NqeUDsgE/https/is1-ssl.mzstatic.com/image/thumb/Music125/v4/6a/74/e5/6a74e5c4-398e-90e9-0b2e-ec96d780316e/21UMGIM75384.rgb.jpg/1024x1024bb.jpg"
+            },
+            "application_id": "886578863147192350"
+        }
+    ]
+}
