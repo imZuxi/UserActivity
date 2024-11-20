@@ -66,13 +66,22 @@ async function extractTopActivity(rawdata) {
     if (ListeningActivity) {
         let ListeningObject = {
             song_name: ListeningActivity.details,
-            song_artist: ListeningActivity.state.replace("by ", ""),
+            song_artist: ListeningActivity.state,
             song_image: "",
             song_start: ListeningActivity.timestamps.start,
             song_end: ListeningActivity.timestamps.end,
             song_length: ListeningActivity.timestamps.end - ListeningActivity.timestamps.start
         };
-        await discordimagesniffer(ListeningActivity.application_id, ListeningActivity.assets.large_image).then(datab => ListeningObject.song_image = datab)
+    
+        // Corrected startsWith and substring with type check
+        if (typeof ListeningObject.song_artist === "string" && ListeningObject.song_artist.startsWith("by ")) {
+            ListeningObject.song_artist = ListeningObject.song_artist.substring(3);
+        }
+    
+        // Await for the image sniffer function
+        await discordimagesniffer(ListeningActivity.application_id, ListeningActivity.assets.large_image)
+            .then(datab => ListeningObject.song_image = datab);
+    
         userobject.song_data = ListeningObject;
     }
 
