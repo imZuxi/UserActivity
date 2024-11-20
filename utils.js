@@ -1,15 +1,22 @@
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const querystring = require('querystring');
 const fs = require('fs/promises')
+const fsa = require('fs')
 const path = require('path')
 const redis = require('redis');
 
+// Spotify API credentials
+const clientId = process.env.SpotifyClientID;
+const clientSecret = process.env.SpotifyclientSecret
+let songlengh = 0;
+let lasttrackid = ""
 let offlinefor = Date.now()
 let laststatus = "idle";
 
 const client = redis.createClient({
-    url: process.env.REDIS_CONNECTION_URI
+    url: process.env.REDIS_CONNECTION_STRING,
 });
+
 client.on('error', (err) => {
     console.error(`Error connecting to Redis server`, err);
     process.exit(1); // Exit the process on Redis connection error
@@ -28,14 +35,10 @@ async function extractTopActivity(rawdata) {
         laststatus = rawdata.status;
     }
 
-    // Sniff incoming data for debugging
-
-    // console.log(require("util").inspect(rawdata, false, null, false));
-    // fs.writeFile(path.join(__dirname, 'sniffeddata.json'), require("util").inspect(rawdata, false, null, false));
-
+    //console.log(require("util").inspect(rawdata, false, null, false));
+    fsa.writeFileSync(path.join(__dirname, 'sniffeddata.json'), require("util").inspect(rawdata, false, null, false));
     let data = JSON.parse(rawdata);
 
-    // force changes status to idle since we dont want to stte when in outher modes you can change this if you want to 
     let status = "idle";
     if (data.status === "offline") {
         status = "offline";
@@ -43,7 +46,7 @@ async function extractTopActivity(rawdata) {
 
     let userobject = {
         status: data.status,
-        spotify: {
+        song_data: {
             song_name: "zuxi <3",
             song_artist: "zuxi",
             song_image: null,
@@ -59,54 +62,33 @@ async function extractTopActivity(rawdata) {
         }
     }
 
-    // console.log(data.activities)
-
-    // this may break against outher apps that use the listining activity
-    const spotifyActivity = data.activities.find(activity => activity.type === 2);
-    if (spotifyActivity) {
-        let spotify = {
-            song_name: spotifyActivity.details,
-            song_artist: spotifyActivity.state,
-            song_image: 'https://i.scdn.co/image/' + spotifyActivity.assets.large_image.split(':')[1],
-            song_start: spotifyActivity.timestamps.start,
-            song_end: spotifyActivity.timestamps.end,
-            song_length: 0
-        };
-        userobject.spotify = spotify;
-    }
-
-    // use Cider Music discord RPC for Apple Music intergration
-    const AppleMusicObject = data.activities.find(activity => activity.name === "Apple Music");
-    if (AppleMusicObject) {
-        console.log(AppleMusicObject.assets.large_image)
-        let spotify = {
-            song_name: AppleMusicObject.details,
-            song_artist: AppleMusicObject.state.replace("by ", ""),
+    const ListeningActivity = data.activities.find(activity => activity.type === 2);
+    if (ListeningActivity) {
+        let ListeningObject = {
+            song_name: ListeningActivity.details,
+            song_artist: ListeningActivity.state.replace("by ", ""),
             song_image: "",
-            song_start: AppleMusicObject.timestamps.start,
-            song_end: AppleMusicObject.timestamps.end,
-            song_length: AppleMusicObject.timestamps.end - AppleMusicObject.timestamps.start
+            song_start: ListeningActivity.timestamps.start,
+            song_end: ListeningActivity.timestamps.end,
+            song_length: ListeningActivity.timestamps.end - ListeningActivity.timestamps.start
         };
-        await discordimagesniffer(AppleMusicObject.application_id, AppleMusicObject.assets.large_image).then(datab => spotify.song_image = datab)
-        userobject.spotify = spotify;
+        await discordimagesniffer(ListeningActivity.application_id, ListeningActivity.assets.large_image).then(datab => ListeningObject.song_image = datab)
+        userobject.song_data = ListeningObject;
     }
 
-
-    const topGameActivity = data.activities.find(activity => activity.type === 0 && activity.name != "Apple Music");
-
+    const topGameActivity = data.activities.find(activity => activity.type === 0 && activity.name !== "Apple Music");
     if (topGameActivity) {
-
         let game = {
             game_name: topGameActivity.name,
             game_image: null,
             game_details: topGameActivity.details || null,
-            playing_since: topGameActivity.created_at
+            playing_since: Date.now()
         }
 
         try {
             discordimagesniffer(topGameActivity.application_id, topGameActivity.assets.large_image).then(datab => game.game_image = datab)
-        } catch (thisError) {
-            console.error(thisError)
+        } catch (eximgsniffer) {
+            console.error(eximgsniffer)
         }
 
         if (!game.game_image) {
@@ -114,53 +96,63 @@ async function extractTopActivity(rawdata) {
         }
 
         try {
+            game.playing_since = topGameActivity.timestamps.start
+
         } catch { };
         userobject.game = game
-
     }
     console.log(JSON.stringify(userobject));
-    
-    // Set to redis key
     client.set("zuxistatus", JSON.stringify(userobject), (err, reply) => {
         if (err) {
             console.error(`Error setting Redis key: ${err}`);
         } else {
             console.log(`Redis key set successfully. Reply: ${reply}`);
         }
-
-        // Close the Redis connection
-
     });
-    // Alt Write to File
+
+
     //  fs.writeFileSync(path.join(__dirname, '../src/utils/zuxijsondata'), JSON.stringify(userobject));
 }
 
 async function discordimagesniffer(applicationid, image_uri) {
     if (isDiscordSnowflake(image_uri)) {
         return `https://cdn.discordapp.com/app-assets/${applicationid}/${image_uri}`;
-    } else {
-        if (image_uri && image_uri.startsWith("mp:external/") && image_uri.includes("https")) {
-            // Extract the part after "https:"
-            const startIndex = image_uri.indexOf("https/");
-
-            if (startIndex !== -1) {
-                return "https://" + image_uri.substring(startIndex + 6);
-            }
-        } else {
-            if (!image_uri) {
-                let img;
-                await cache(applicationid).then(datab => img = `https://cdn.discordapp.com/app-icons/${applicationid}/${datab}`)
-                return img
-            }
-        }
-        return image_uri;
     }
+    if (image_uri && image_uri.startsWith("spotify")) {
+        return 'https://i.scdn.co/image/' + image_uri.split(':')[1]
+    }
+
+    if (image_uri && image_uri.startsWith("mp:external/") && image_uri.includes("https")) {
+        // Extract the part after "https://"
+        const startIndex = image_uri.indexOf("https/");
+        if (startIndex !== -1) {
+            return "https://" + image_uri.substring(startIndex + 6); // 6 accounts for "https/"
+        }
+    }
+
+    if (!image_uri) {
+        let img;
+        await cache(applicationid).then(datab => img = `https://cdn.discordapp.com/app-icons/${applicationid}/${datab}`)
+        return img
+    }
+
+    return image_uri;
 }
+
+
 
 function isDiscordSnowflake(input) {
     const snowflakeRegex = /^[0-9]{18,19}$/;
     return snowflakeRegex.test(input);
 }
+
+// Example usage
+module.exports = {
+    extractTopActivity
+}
+
+// Function to obtain access token and get track information
+
 
 async function cache(name, value) {
     let cacheData = {};
@@ -207,10 +199,8 @@ async function cache(name, value) {
     // Return the requested value
     return cacheData[name];
 }
-// yes discord can fire so fast we need to add it to a list 
 let lookupid = [];
-const cacheFilePath = path.join(__dirname, 'gamecache.json');
-module.exports = {
-    extractTopActivity
-}
+//,
 
+
+const cacheFilePath = path.join(__dirname, 'gamecache.json');
