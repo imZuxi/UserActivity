@@ -95,7 +95,8 @@ async function extractTopActivity(rawdata) {
         }
 
         try {
-            discordimagesniffer(topGameActivity.application_id, topGameActivity.assets.large_image).then(datab => game.game_image = datab)
+          let tempImage = topGameActivity.assets.large_image ?? topGameActivity.assets.small_image;
+          await discordimagesniffer(topGameActivity.application_id, tempImage).then(datab => game.game_image = datab)
         } catch (eximgsniffer) {
             console.error(eximgsniffer)
         }
