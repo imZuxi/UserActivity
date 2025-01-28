@@ -5,11 +5,6 @@ const fsa = require('fs')
 const path = require('path')
 const redis = require('redis');
 
-// Spotify API credentials
-const clientId = process.env.SpotifyClientID;
-const clientSecret = process.env.SpotifyclientSecret
-let songlengh = 0;
-let lasttrackid = ""
 let offlinefor = Date.now()
 let laststatus = "idle";
 
@@ -106,9 +101,8 @@ async function extractTopActivity(rawdata) {
         }
 
         try {
-            game.playing_since = topGameActivity.timestamps.start
-
-        } catch { };
+            game.playing_since = topGameActivity.timestamps.start ?? topGameActivity.created_at // discord doesnt provide timestamps.start sometimes, so we just can grab the created at if not already existing.
+        } catch { game.playing_since = topGameActivity.created_at };
         userobject.game = game
     }
     console.log(JSON.stringify(userobject));
@@ -119,9 +113,7 @@ async function extractTopActivity(rawdata) {
             console.log(`Redis key set successfully. Reply: ${reply}`);
         }
     });
-
-
-    //  fs.writeFileSync(path.join(__dirname, '../src/utils/zuxijsondata'), JSON.stringify(userobject));
+   fs.writeFileSync(path.join(__dirname, 'processed.json'), JSON.stringify(userobject));
 }
 
 async function discordimagesniffer(applicationid, image_uri) {
@@ -149,20 +141,14 @@ async function discordimagesniffer(applicationid, image_uri) {
     return image_uri;
 }
 
-
-
 function isDiscordSnowflake(input) {
     const snowflakeRegex = /^[0-9]{18,19}$/;
     return snowflakeRegex.test(input);
 }
 
-// Example usage
 module.exports = {
     extractTopActivity
 }
-
-// Function to obtain access token and get track information
-
 
 async function cache(name, value) {
     let cacheData = {};
